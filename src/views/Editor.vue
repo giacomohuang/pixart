@@ -82,7 +82,7 @@ onMounted(() => {
   scaledSize = grid.size
   gridEl = document.querySelector('.grid')
 
-  drawGrid(grid.size)
+  drawGrid()
   gridElRect = gridEl.getBoundingClientRect()
   // testEl = document.querySelector('.test')
   // testCtx = testEl.getContext('2d')
@@ -131,6 +131,9 @@ function onKeyDown(e) {
   e.preventDefault()
   currentKey.value = Keyboard.getComboKey(e)
   switch (currentKey.value) {
+    case 'ESC':
+      clearSelection()
+      break
     case 'SPACE':
       // 拖拽模式
       currentMode.value = 'move'
@@ -206,13 +209,10 @@ function onMouseWheel(e) {
     scaledSize = 50
   }
   // scale = scale / 40
-
-  drawGrid(scaledSize)
-
   canvasEl.style.transform = `scale(${scaledSize / grid.size})`
-  selectionEl.setAttribute('width', grid.width)
-  selectionEl.setAttribute('height', grid.height)
-  selectionEl.style.transform = `scale(${scaledSize / grid.size})`
+  drawGrid()
+  drawSelection()
+  drawControl()
 }
 
 // 保存当前画布状态
@@ -299,7 +299,7 @@ function fillGrid(posArray, color) {
   })
   // canvasCtx.stroke()
   // console.log('fill')
-  // console.log(performance.now() - startTime + 'ms')
+  // console.log(performance.now() - startTime + 'ms')`
 }
 
 // 橡皮擦
@@ -343,38 +343,40 @@ function fillArea(col, row, newColor) {
 }
 
 // 画选区
-function drawSelection(col, row, w, h) {
+function drawSelection() {
+  selectionEl.setAttribute('width', grid.col * scaledSize + grid.x + 20)
+  selectionEl.setAttribute('height', grid.row * scaledSize + grid.y + 20)
   selectionCtx.clearRect(0, 0, grid.width, grid.height)
   selectionCtx.fillStyle = '#cccccc99'
   selectionCtx.strokeStyle = 'black'
+  console.log(selRect)
   // console.log(x * grid.size, y * grid.size, w * grid.size, h * grid.size)
-  let x = col * grid.size
-  let y = row * grid.size
-  let width = w * grid.size + 50
-  let height = h * grid.size + 50
+  let x = selRect.col * scaledSize + 50
+  let y = selRect.row * scaledSize + 50
+  let width = selRect.w * scaledSize
+  let height = selRect.h * scaledSize
   selectionCtx.fillRect(x, y, width, height)
-  selRect = { x: x, y: y, w: width, h: height }
 }
 
 function drawControl() {
-  if (selRect.w && selRect.h) {
+  if (selRect.w) {
     selectionCtx.strokeStyle = '#000'
     selectionCtx.fillStyle = '#fff'
-    const actualSize = (5 * scaledSize) / grid.size
+    const radius = 5
     selectionCtx.beginPath()
-    selectionCtx.arc(selRect.x, selRect.y, actualSize, 0, 2 * Math.PI)
+    selectionCtx.arc(selRect.col * scaledSize + grid.x, selRect.row * scaledSize + grid.y, radius, 0, 2 * Math.PI)
     selectionCtx.fill()
     selectionCtx.stroke()
     selectionCtx.beginPath()
-    selectionCtx.arc(selRect.x + selRect.w, selRect.y, actualSize, 0, 2 * Math.PI)
+    selectionCtx.arc((selRect.col + selRect.w) * scaledSize + grid.x, selRect.row * scaledSize + grid.y, radius, 0, 2 * Math.PI)
     selectionCtx.fill()
     selectionCtx.stroke()
     selectionCtx.beginPath()
-    selectionCtx.arc(selRect.x + selRect.w, selRect.y + selRect.h, actualSize, 0, 2 * Math.PI)
+    selectionCtx.arc(selRect.col * scaledSize + grid.x, (selRect.row + selRect.h) * scaledSize + grid.y, radius, 0, 2 * Math.PI)
     selectionCtx.fill()
     selectionCtx.stroke()
     selectionCtx.beginPath()
-    selectionCtx.arc(selRect.x, selRect.y + selRect.h, actualSize, 0, 2 * Math.PI)
+    selectionCtx.arc((selRect.col + selRect.w) * scaledSize + grid.x, (selRect.row + selRect.h) * scaledSize + grid.y, radius, 0, 2 * Math.PI)
     selectionCtx.fill()
     selectionCtx.stroke()
   }
@@ -416,10 +418,10 @@ function updatePreview() {
   previewCtx.drawImage(canvasEl, 0, 0, grid.width, grid.height, 0, 0, Math.floor(previewScale * grid.width), Math.floor(previewScale * grid.height))
 }
 
-function drawGrid(size) {
+function drawGrid() {
   console.log('draw grid')
-  gridEl.setAttribute('width', grid.col * size + grid.x + 20)
-  gridEl.setAttribute('height', grid.row * size + grid.y + 20)
+  gridEl.setAttribute('width', grid.col * scaledSize + grid.x + 20)
+  gridEl.setAttribute('height', grid.row * scaledSize + grid.y + 20)
   gridCtx = gridEl.getContext('2d')
   gridCtx.translate(0.5, 0.5)
   let i = 0
@@ -434,29 +436,29 @@ function drawGrid(size) {
     // reverse
     // let temp=i*2-1
     if (((i % 5 == 0 && i !== 0) || i === 1 || i === grid.col) && i <= grid.col) {
-      gridCtx.fillText(i, (grid.col - i) * size + grid.x + (size - textSize.w) / 2, grid.y - 5)
-      gridCtx.fillText(i, (grid.col - i) * size + grid.x + (size - textSize.w) / 2, size * grid.row + grid.y + 15)
+      gridCtx.fillText(i, (grid.col - i) * scaledSize + grid.x + (scaledSize - textSize.w) / 2, grid.y - 5)
+      gridCtx.fillText(i, (grid.col - i) * scaledSize + grid.x + (scaledSize - textSize.w) / 2, scaledSize * grid.row + grid.y + 15)
     }
     //y-axis
     if (((i % 5 == 0 && i !== 0) || i === 1 || i === grid.row) && i <= grid.row) {
-      gridCtx.fillText(i, grid.x - gridCtx.measureText(i).width - 5, (grid.row - i) * size + grid.y + (size - textSize.h) / 2 + 10)
-      gridCtx.fillText(i, grid.col * size + grid.x + 5, (grid.row - i) * size + grid.y + (size - textSize.h) / 2 + 10)
+      gridCtx.fillText(i, grid.x - gridCtx.measureText(i).width - 5, (grid.row - i) * scaledSize + grid.y + (scaledSize - textSize.h) / 2 + 10)
+      gridCtx.fillText(i, grid.col * scaledSize + grid.x + 5, (grid.row - i) * scaledSize + grid.y + (scaledSize - textSize.h) / 2 + 10)
     }
     // draw grid line
-    const point = i * size
+    const point = i * scaledSize
 
     if (i <= grid.row) {
       gridCtx.beginPath()
       gridCtx.strokeStyle = (grid.row - i) % 5 !== 0 ? '#333' : '#d07c7c'
       gridCtx.moveTo(grid.x, point + grid.y)
-      gridCtx.lineTo(grid.col * size + grid.x, point + grid.y)
+      gridCtx.lineTo(grid.col * scaledSize + grid.x, point + grid.y)
       gridCtx.stroke()
     }
     if (i <= grid.col) {
       gridCtx.beginPath()
       gridCtx.strokeStyle = (grid.col - i) % 5 !== 0 ? '#333' : '#d07c7c'
       gridCtx.moveTo(point + grid.x, grid.y)
-      gridCtx.lineTo(point + grid.x, grid.row * size + grid.y)
+      gridCtx.lineTo(point + grid.x, grid.row * scaledSize + grid.y)
       gridCtx.stroke()
     }
     i++
@@ -565,13 +567,14 @@ function onMouseDown(e) {
         }
         break
       case 'selector':
-        var x, y, w, h
+        var col, row, w, h
         if (button === 0) {
-          x = orinPos.col <= newPos.col ? orinPos.col : newPos.col
-          y = orinPos.row <= newPos.row ? orinPos.row : newPos.row
+          col = orinPos.col <= newPos.col ? orinPos.col : newPos.col
+          row = orinPos.row <= newPos.row ? orinPos.row : newPos.row
           w = Math.abs(orinPos.col - newPos.col) + 1
           h = Math.abs(orinPos.row - newPos.row) + 1
-          drawSelection(x, y, w, h)
+          selRect = { col: col, row: row, w: w, h: h }
+          drawSelection()
         }
     }
   }
