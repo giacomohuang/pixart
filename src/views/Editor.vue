@@ -13,13 +13,13 @@
         <li title="垂直镜像" :class="{ active: mirrorMode === 'vertical' }" @click="mirrorMode = 'vertical'"><img src="@/assets/mirror-v.png" alt="垂直镜像" /></li>
         <li title="中心镜像" :class="{ active: mirrorMode === 'center' }" @click="mirrorMode = 'center'"><img src="@/assets/mirror-c.png" alt="中心镜像" /></li>
       </ul>
-      <div style="margin-left: 20px">{{ mousePos.x }},{{ mousePos.y }},{{ oldTool }},{{ currentTool }}</div>
+      <div style="margin-left: 20px">pos: {{ mousePos.x }},{{ mousePos.y }}, mode: {{ currentMode }}, tool: {{ currentTool }}</div>
     </div>
 
     <div class="container">
       <el-scrollbar class="main-scroller">
-        <div class="draw" @contextmenu.prevent :class="{ 'cur-move': currentTool == 'move' }">
-          <div class="drag">
+        <div class="draw" @contextmenu.prevent :class="{ 'cur-move': currentMode == 'move' }">
+          <div class="drag" :class="{ 'cur-prevent': currentMode == 'move' }">
             <canvas class="selection"></canvas>
             <canvas class="canvas" :class="'cur-' + currentTool"></canvas>
             <canvas class="grid"></canvas>
@@ -47,13 +47,11 @@ import palettes from './palettes'
 import Keyboard from '@/js/keyboard'
 let grid, gridElRect, gridEl, gridCtx, previewEl, canvasEl, canvasCtx, previewScale, drawEl, previewCtx, dragEl, scaledSize
 const currentKey = ref('')
-const oldKey = ref('')
-
 const mousePos = ref({ x: 0, y: 0 })
 const currentTool = ref('pen')
+const currentMode = ref('')
 const oldTool = ref('')
 const eraseMode = ref(false)
-const selectMode = ref(false)
 const palette = ref(palettes.default)
 const currentColor = ref(palette.value[1])
 // const currentMode = ref('default')
@@ -134,10 +132,10 @@ onMounted(() => {
 function onKeyDown(e) {
   // console.log(e)
   e.preventDefault()
-  const key = Keyboard.getComboKey(e)
-  if (key == oldKey.value) return
-  oldKey.value = key
-  currentKey.value = key
+  // const key =
+  // if (key == oldKey.value) return
+  // oldKey.value = key
+  currentKey.value = Keyboard.getComboKey(e)
   console.log(currentKey.value)
   switch (currentKey.value) {
     case 'ESC':
@@ -145,15 +143,13 @@ function onKeyDown(e) {
       break
     case 'SPACE':
       // 拖拽模式
-      oldTool.value = currentTool.value
-      currentTool.value = 'move'
+      currentMode.value = 'move'
 
       break
     case 'ALT':
     case 'CMD':
       // 吸管模式
-      oldTool.value = currentTool.value
-      currentTool.value = 'drop'
+      currentMode.value = 'drop'
 
       break
     case 'CTRL+Z':
@@ -175,10 +171,11 @@ function onKeyDown(e) {
 // }
 
 function onKeyUp() {
-  console.log(oldTool, currentTool)
-  currentTool.value = oldTool.value
+  // console.log(oldTool, currentTool)
+  // currentTool.value = oldTool.value
   currentKey.value = ''
-  oldKey.value = ''
+  currentMode.value = ''
+  // oldKey.value = ''
 }
 
 function onMouseWheel(e) {
@@ -470,14 +467,14 @@ function onMouseDown(e) {
   let delta = {}
   // if (!oldPos) return
   // 鼠标左键+空格：拖拽画布
-  if (button == 0 && currentTool.value == 'move') {
+  if (button == 0 && currentMode.value == 'move') {
     console.log('start drag canvas')
     window.addEventListener('mousemove', onDraggingCanvas)
     window.addEventListener('mouseup', onStopDragCanvas)
     delta = { x: e.clientX + drawEl.scrollLeft - dragEl.offsetLeft, y: e.clientY + drawEl.scrollTop - dragEl.offsetTop }
   }
   // 鼠标左键+画笔工具选中：画线
-  else if (button == 0 && currentTool.value == 'pen') {
+  else if (button == 0 && currentTool.value == 'pen' && currentMode.value == '') {
     window.addEventListener('mousemove', onDrawing)
     window.addEventListener('mouseup', onStopDraw)
   }
@@ -488,7 +485,7 @@ function onMouseDown(e) {
     updatePreview()
   }
   // 鼠标左键+alt/cmd: 取色
-  else if (button == 0 && ['CMD', 'ALT'].includes(currentKey.value)) {
+  else if (button == 0 && currentMode.value == 'drop') {
     console.log('dropper')
     currentColor.value = getGridColor(oldPos.col, oldPos.row)
     // console.log(currentColor.value)
@@ -707,6 +704,9 @@ function onMouseDown(e) {
 .cur-move {
   cursor: move;
 }
+.cur-prevent {
+  pointer-events: none;
+}
 .cur-pen {
   cursor: url('@/assets/pen.png') 8 23, auto;
 }
@@ -785,7 +785,6 @@ function onMouseDown(e) {
   width: calc(100vw - 200px);
   position: relative;
   display: block;
-  // overflow: auto;
   z-index: 1;
 }
 
