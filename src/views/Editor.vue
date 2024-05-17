@@ -18,10 +18,10 @@
 
     <div class="container">
       <el-scrollbar class="main-scroller">
-        <div class="draw" :class="{ 'cur-move': currentKey == 'SPACE' }">
+        <div class="draw" :class="['cur-' + currentTool, 'cur-' + currentMode, { 'cur-erase': eraseMode }, { 'cur-move': currentKey == 'SPACE' }]">
           <div class="drag">
             <canvas class="selection" @contextmenu.prevent></canvas>
-            <canvas class="canvas" @contextmenu.prevent :class="['cur-' + currentTool, 'cur-' + currentMode, { 'cur-erase': eraseMode }]"></canvas>
+            <canvas class="canvas" @contextmenu.prevent></canvas>
             <canvas class="grid" @contextmenu.prevent></canvas>
           </div>
         </div>
@@ -107,22 +107,22 @@ onMounted(() => {
 
   selectionEl = document.querySelector('.selection')
   selectionCtx = selectionEl.getContext('2d')
-  selectionEl.setAttribute('width', grid.width)
-  selectionEl.setAttribute('height', grid.height)
+  selectionEl.setAttribute('width', grid.width + grid.x + 20)
+  selectionEl.setAttribute('height', grid.height + grid.y + 20)
 
   canvasEl.style.transformOrigin = `0 0`
   selectionEl.style.transformOrigin = `0 0`
 
-  dragEl.addEventListener('mousedown', onMouseDown)
-  window.addEventListener('mousemove', (e) => {
-    ;[mousePos.value.x, mousePos.value.y] = [e.clientX + drawEl.scrollLeft - dragEl.offsetLeft - gridElRect.left - grid.x, e.clientY + drawEl.scrollTop - dragEl.offsetTop - gridElRect.top - grid.x]
-  })
+  // window.addEventListener('mousemove', (e) => {
+  //   ;[mousePos.value.x, mousePos.value.y] = [e.clientX + drawEl.scrollLeft - dragEl.offsetLeft - gridElRect.left - grid.x, e.clientY + drawEl.scrollTop - dragEl.offsetTop - gridElRect.top - grid.x]
+  // })
 
   dragEl.addEventListener('wheel', onMouseWheel)
 
+  window.addEventListener('mousedown', onMouseDown)
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('keyup', onKeyUp)
-  window.addEventListener('mousedown', onStartDragCanvas)
+
   // saveCanvasState()
 })
 
@@ -140,15 +140,13 @@ function onKeyDown(e) {
       break
     case 'ALT':
     case 'CMD':
+      // 吸管模式
       currentMode.value = 'drop'
       break
     case 'CTRL+Z':
     case 'CMD+Z':
       // undo
       undo()
-      break
-    case 'SHIFT':
-      currentMode.value = 'selection'
       break
     case 'CTRL+SHIFT+Z':
     case 'CMD+SHIFT+Z':
@@ -157,39 +155,15 @@ function onKeyDown(e) {
     default:
       currentMode.value = 'default'
   }
-  // console.log(currentKey.value)
 }
 
-function onStartDragCanvas(e) {
-  if (currentKey.value !== 'SPACE') return
-  console.log('startdrag')
-  window.addEventListener('mousemove', onDraggingCanvas)
-  window.addEventListener('mouseup', onStopDragCanvas)
-  let delta = { x: e.clientX + drawEl.scrollLeft - dragEl.offsetLeft, y: e.clientY + drawEl.scrollTop - dragEl.offsetTop }
+// function onStartDragCanvas(e) {
 
-  function onDraggingCanvas(e) {
-    e.stopPropagation()
-
-    if (e.button == 0 && currentKey.value === 'SPACE') {
-      if (currentKey.value === 'SPACE') {
-        // dragEl.style.left = e.clientX + drawEl.scrollLeft - delta.x < -drawEl.offsetWidth / 2 ? -drawEl.offsetWidth / 2 : e.clientX - delta.x + 'px'
-        // dragEl.style.top = e.clientY + drawEl.scrollTop - delta.y < -drawEl.offsetHeight / 2 ? -drawEl.offsetHeight / 2 : e.clientY - delta.y + 'px'
-        dragEl.style.left = e.clientX - delta.x + 'px'
-        dragEl.style.top = e.clientY - delta.y + 'px'
-        // console.log(drawEl.offsetHeight)
-      }
-    }
-  }
-
-  function onStopDragCanvas() {
-    window.removeEventListener('mousemove', onDraggingCanvas)
-    window.removeEventListener('mouseup', onStopDragCanvas)
-  }
-}
+// }
 
 function onKeyUp() {
   currentKey.value = ''
-  currentMode.value = 'fault'
+  currentMode.value = ''
 }
 
 function onMouseWheel(e) {
@@ -249,7 +223,10 @@ function undo() {
     // let curState = historyStack[currentStep]
 
     currentStep--
-    if (currentStep == -1) canvasCtx.clearRect(0, 0, grid.width, grid.height)
+    if (currentStep == -1) {
+      canvasCtx.clearRect(0, 0, grid.width, grid.height)
+      updatePreview()
+    }
     if (currentStep < 0) return
     let prevState = historyStack[currentStep]
     // canvasCtx.clearRect(0, 0, grid.width, grid.height)
@@ -259,6 +236,7 @@ function undo() {
     img.onload = function () {
       canvasCtx.clearRect(0, 0, grid.width, grid.height)
       canvasCtx.drawImage(img, 0, 0)
+      updatePreview()
     }
   }
   console.log(currentStep, historyStack)
@@ -275,6 +253,7 @@ function redo() {
     img.onload = function () {
       canvasCtx.clearRect(0, 0, grid.width, grid.height)
       canvasCtx.drawImage(img, 0, 0)
+      updatePreview()
     }
   }
   // console.log(currentStep, historyStack)
@@ -282,12 +261,10 @@ function redo() {
 
 function getGridPosByMouse(x, y) {
   // console.log(x, y)
-  if (x > 0 && x < grid.col * scaledSize && y > 0 && y < grid.row * scaledSize) {
-    // console.log('in')
-    const col = Math.floor(x / scaledSize)
-    const row = Math.floor(y / scaledSize)
-    return { col: col, row: row }
-  }
+  let col, row
+  col = Math.floor(x / scaledSize)
+  row = Math.floor(y / scaledSize)
+  return { col: col, row: row }
 }
 
 // 画笔
@@ -349,7 +326,7 @@ function drawSelection() {
   selectionCtx.clearRect(0, 0, grid.width, grid.height)
   selectionCtx.fillStyle = '#cccccc99'
   selectionCtx.strokeStyle = 'black'
-  console.log(selRect)
+  // console.log(selRect)
   // console.log(x * grid.size, y * grid.size, w * grid.size, h * grid.size)
   let x = selRect.col * scaledSize + 50
   let y = selRect.row * scaledSize + 50
@@ -358,50 +335,47 @@ function drawSelection() {
   selectionCtx.fillRect(x, y, width, height)
 }
 
+// 画选区的四个控制点
 function drawControl() {
   if (selRect.w) {
     selectionCtx.strokeStyle = '#000'
     selectionCtx.fillStyle = '#fff'
     const radius = 5
-    selectionCtx.beginPath()
-    selectionCtx.arc(selRect.col * scaledSize + grid.x, selRect.row * scaledSize + grid.y, radius, 0, 2 * Math.PI)
-    selectionCtx.fill()
-    selectionCtx.stroke()
-    selectionCtx.beginPath()
-    selectionCtx.arc((selRect.col + selRect.w) * scaledSize + grid.x, selRect.row * scaledSize + grid.y, radius, 0, 2 * Math.PI)
-    selectionCtx.fill()
-    selectionCtx.stroke()
-    selectionCtx.beginPath()
-    selectionCtx.arc(selRect.col * scaledSize + grid.x, (selRect.row + selRect.h) * scaledSize + grid.y, radius, 0, 2 * Math.PI)
-    selectionCtx.fill()
-    selectionCtx.stroke()
-    selectionCtx.beginPath()
-    selectionCtx.arc((selRect.col + selRect.w) * scaledSize + grid.x, (selRect.row + selRect.h) * scaledSize + grid.y, radius, 0, 2 * Math.PI)
-    selectionCtx.fill()
-    selectionCtx.stroke()
+    selRect.ctrlPos = [
+      [selRect.col * scaledSize + grid.x, selRect.row * scaledSize + grid.y],
+      [(selRect.col + selRect.w) * scaledSize + grid.x, selRect.row * scaledSize + grid.y],
+      [selRect.col * scaledSize + grid.x, (selRect.row + selRect.h) * scaledSize + grid.y],
+      [(selRect.col + selRect.w) * scaledSize + grid.x, (selRect.row + selRect.h) * scaledSize + grid.y]
+    ]
+    selRect.ctrlPos.forEach(([x, y]) => {
+      selectionCtx.beginPath()
+      selectionCtx.arc(x, y, radius, 0, 2 * Math.PI)
+      selectionCtx.fill()
+      selectionCtx.stroke()
+    })
   }
 }
 
 // 清除选区
 function clearSelection() {
-  selectionCtx.clearRect(0, 0, grid.width, grid.height)
+  selectionCtx.clearRect(0, 0, grid.width + grid.x + 20, grid.height + grid.y + 20)
   selRect = {}
 }
 
-function deleteSelection() {
-  if (selRect.w && selRect.h) {
-    const { x, y, w, h } = selRect
-    canvasCtx.clearRect(x, y, w, h)
-  }
-}
+// function deleteSelection() {
+//   if (selRect.w && selRect.h) {
+//     const { x, y, w, h } = selRect
+//     canvasCtx.clearRect(x, y, w, h)
+//   }
+// }
 
-function copySelection() {
-  if (selRect.w && selRect.h) {
-    const { x, y, w, h } = selRect
-    const imgData = canvasCtx.getImageData(x, y, w, h)
-    clipboard = imgData
-  }
-}
+// function copySelection() {
+//   if (selRect.w && selRect.h) {
+//     const { x, y, w, h } = selRect
+//     const imgData = canvasCtx.getImageData(x, y, w, h)
+//     clipboard = imgData
+//   }
+// }
 
 // 获取网格色值
 function getGridColor(row, col) {
@@ -467,7 +441,7 @@ function drawGrid() {
 }
 
 function onMouseDown(e) {
-  // e.stopPropagation()
+  e.stopPropagation()
   console.log('mouse down')
   const mouseInfo = { target: e.target, time: new Date().getTime() }
   // console.log(drawEl.scrollLeft, drawEl.scrollTop)
@@ -478,31 +452,56 @@ function onMouseDown(e) {
   // console.log(canvasEl.scrollLeft)
   let orinPos = getGridPosByMouse(orinX, orinY)
   let oldPos = {}
-  if (!orinPos) return
-  // 鼠标左键，绘制
-  if (button == 0 && currentKey.value == '') {
-    switch (currentTool.value) {
-      case 'pen':
-      case 'selector':
-        // 铅笔工具，移动或抬起鼠标左键才触发绘制
-        window.addEventListener('mousemove', onMouseMove)
-        window.addEventListener('mouseup', onMouseUp)
-        break
-      case 'fill':
-        // 油漆桶工具，按下鼠标左键就立即触发绘制
-        fillArea(orinPos.col, orinPos.row, currentColor.value)
-        saveCanvasState()
-        updatePreview()
-        break
-    }
+  let delta = {}
+  // if (!orinPos) return
+  // 鼠标左键+空格：拖拽画布
+  if (button == 0 && currentMode.value == 'move') {
+    console.log('start drag canvas')
+    window.addEventListener('mousemove', onDraggingCanvas)
+    window.addEventListener('mouseup', onStopDragCanvas)
+    delta = { x: e.clientX + drawEl.scrollLeft - dragEl.offsetLeft, y: e.clientY + drawEl.scrollTop - dragEl.offsetTop }
   }
-  // alt或cmd键按下，取色
+  // 鼠标左键+画笔工具选中：画线
+  else if (button == 0 && currentTool.value == 'pen') {
+    window.addEventListener('mousemove', onDrawing)
+    window.addEventListener('mouseup', onStopDraw)
+  }
+  // 鼠标左键+油漆桶工具选中：填色
+  else if (button === 0 && currentTool.value == 'fill') {
+    fillArea(orinPos.col, orinPos.row, currentColor.value)
+    saveCanvasState()
+    updatePreview()
+  }
+  // 鼠标左键+alt/cmd: 取色
   else if (button == 0 && ['CMD', 'ALT'].includes(currentKey.value)) {
+    console.log('dropper')
     currentColor.value = getGridColor(orinPos.col, orinPos.row)
     // console.log(currentColor.value)
   }
+  // 鼠标左键+选择工具选中：选区
+  else if (button == 0 && currentTool.value == 'selector') {
+    console.log('sele')
+    const oldPos = getGridPosByMouse(e.clientX + drawEl.scrollLeft - dragEl.offsetLeft - gridElRect.left - grid.x, e.clientY + drawEl.scrollTop - dragEl.offsetTop - gridElRect.top - grid.x)
+    // let newPos = {}
+    delta = { x: oldPos.col - selRect.col, y: oldPos.row - selRect.row }
+    // 鼠标在选区内：拖动选取
+    // inside selection
+    if (oldPos.col >= selRect.col && oldPos.col <= selRect.col + selRect.w && oldPos.row >= selRect.row && oldPos.row <= selRect.row + selRect.h) {
+      selRect.drag = true
+      console.log('dragstart')
+      window.addEventListener('mousemove', onDraggingSelection)
+      window.addEventListener('mouseup', onStopDragSelection)
+    }
+    // 鼠标在选取外: 绘制/重绘选区
+    // inside outside
+    else {
+      clearSelection()
+      window.addEventListener('mousemove', onDrawingSelection)
+      window.addEventListener('mouseup', onStopDrawSelection)
+    }
+  }
   // 鼠标右键，擦除
-  else if (button == 2 && currentKey.value == '') {
+  else if (button == 2) {
     // console.log('erase')
     const posArray = []
     posArray.push({ col: orinPos.col, row: orinPos.row })
@@ -521,14 +520,83 @@ function onMouseDown(e) {
     }
     eraseMode.value = true
     eraseGrid(posArray, currentColor.value)
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
-    updatePreview()
+    window.addEventListener('mousemove', onDrawing)
+    window.addEventListener('mouseup', onStopDraw)
     saveCanvasState()
+    updatePreview()
   }
 
-  function onMouseMove(e) {
-    // console.log('move')
+  function onDraggingSelection(e) {
+    // e.stopPropagation()
+    const newPos = getGridPosByMouse(e.clientX + drawEl.scrollLeft - dragEl.offsetLeft - gridElRect.left - grid.x, e.clientY + drawEl.scrollTop - dragEl.offsetTop - gridElRect.top - grid.x)
+    if (!(newPos.col === oldPos.col && newPos.row === oldPos.row)) {
+      selRect.col = newPos.col - delta.x
+      if (selRect.col < 0) selRect.col = 0
+      if (selRect.col + selRect.w > grid.col) selRect.col = grid.col - selRect.w
+      selRect.row = newPos.row - delta.y
+      if (selRect?.row < 0) selRect.row = 0
+      if (selRect?.row + selRect.h > grid.row) selRect.row = grid.row - selRect.h
+      // console.log(dx, dy)
+      drawSelection()
+      drawControl()
+    }
+  }
+  function onStopDragSelection() {
+    window.removeEventListener('mousemove', onDraggingSelection)
+    window.removeEventListener('mouseup', onStopDragSelection)
+    selRect.drag = false
+  }
+
+  function onDraggingCanvas(e) {
+    console.log('dragging canvas')
+    e.stopPropagation()
+
+    if (e.button == 0 && currentKey.value === 'SPACE') {
+      if (currentKey.value === 'SPACE') {
+        // dragEl.style.left = e.clientX + drawEl.scrollLeft - delta.x < -drawEl.offsetWidth / 2 ? -drawEl.offsetWidth / 2 : e.clientX - delta.x + 'px'
+        // dragEl.style.top = e.clientY + drawEl.scrollTop - delta.y < -drawEl.offsetHeight / 2 ? -drawEl.offsetHeight / 2 : e.clientY - delta.y + 'px'
+        dragEl.style.left = e.clientX - delta.x + 'px'
+        dragEl.style.top = e.clientY - delta.y + 'px'
+        // console.log(drawEl.offsetHeight)
+      }
+    }
+  }
+
+  function onStopDragCanvas() {
+    console.log('stop dragging canvas')
+    window.removeEventListener('mousemove', onDraggingCanvas)
+    window.removeEventListener('mouseup', onStopDragCanvas)
+  }
+
+  function onDrawingSelection(e) {
+    const newX = e.clientX + drawEl.scrollLeft - dragEl.offsetLeft - gridElRect.left - grid.x
+    const newY = e.clientY + drawEl.scrollTop - dragEl.offsetTop - gridElRect.top - grid.x
+    let newPos = getGridPosByMouse(newX, newY)
+    console.log('move sele')
+    var col, row, w, h
+    if (button === 0) {
+      if (newPos.col >= grid.col) newPos.col = grid.col
+      else if (newPos.col < 0) newPos.col = 0
+      if (newPos.row >= grid.row) newPos.row = grid.row
+      else if (newPos.row < 0) newPos.row = 0
+      col = orinPos.col <= newPos.col ? orinPos.col : newPos.col
+      row = orinPos.row <= newPos.row ? orinPos.row : newPos.row
+      w = Math.abs(orinPos.col - newPos.col)
+      h = Math.abs(orinPos.row - newPos.row)
+      selRect = { col: col, row: row, w: w, h: h }
+      console.log(orinPos, newPos)
+      drawSelection()
+    }
+  }
+
+  function onStopDrawSelection() {
+    drawControl()
+    window.removeEventListener('mousemove', onDrawingSelection)
+    window.removeEventListener('mouseup', onStopDrawSelection)
+  }
+
+  function onDrawing(e) {
+    console.log('move')
     // 如果在绘画时有键盘按键按下
     if (currentKey.value) {
       currentKey.value = ''
@@ -541,8 +609,40 @@ function onMouseDown(e) {
     // console.log('ppos', oldPos, newPos)
     if (!newPos || (newPos.col == oldPos.col && newPos.row == oldPos.row)) return
     oldPos = { col: newPos.col, row: newPos.row }
-    switch (currentTool.value) {
-      case 'pen':
+    posArray.push({ col: newPos.col, row: newPos.row })
+    switch (mirrorMode.value) {
+      case 'horizontal':
+        posArray.push({ col: grid.col - newPos.col - 1, row: newPos.row })
+        break
+      case 'vertical':
+        posArray.push({ col: newPos.col, row: grid.row - newPos.row - 1 })
+        break
+      case 'center':
+        posArray.push({ col: grid.col - newPos.col - 1, row: newPos.row })
+        posArray.push({ col: newPos.col, row: grid.row - newPos.row - 1 })
+        posArray.push({ col: grid.col - newPos.col - 1, row: grid.row - newPos.row - 1 })
+        break
+    }
+    if (button == 0) {
+      if (currentColor.value == '#00000000') {
+        eraseGrid(posArray, currentColor.value)
+      }
+      fillGrid(posArray, currentColor.value)
+    } else if (button == 2) {
+      eraseGrid(posArray, currentColor.value)
+    }
+  }
+
+  function onStopDraw(e) {
+    // console.log('mouse up')
+    const newX = e.clientX + drawEl.scrollLeft - dragEl.offsetLeft - gridElRect.left - grid.x
+    const newY = e.clientY + drawEl.scrollTop - dragEl.offsetTop - gridElRect.top - grid.x
+    let newPos = getGridPosByMouse(newX, newY)
+    if (newPos) {
+      const timeDiff = new Date().getTime() - mouseInfo.time
+      if (mouseInfo.target === e.target && timeDiff < 200) {
+        console.log('click')
+        const posArray = []
         posArray.push({ col: newPos.col, row: newPos.row })
         switch (mirrorMode.value) {
           case 'horizontal':
@@ -565,67 +665,14 @@ function onMouseDown(e) {
         } else if (button == 2) {
           eraseGrid(posArray, currentColor.value)
         }
-        break
-      case 'selector':
-        var col, row, w, h
-        if (button === 0) {
-          col = orinPos.col <= newPos.col ? orinPos.col : newPos.col
-          row = orinPos.row <= newPos.row ? orinPos.row : newPos.row
-          w = Math.abs(orinPos.col - newPos.col) + 1
-          h = Math.abs(orinPos.row - newPos.row) + 1
-          selRect = { col: col, row: row, w: w, h: h }
-          drawSelection()
-        }
-    }
-  }
-
-  function onMouseUp(e) {
-    // console.log('mouse up')
-    const newX = e.clientX + drawEl.scrollLeft - dragEl.offsetLeft - gridElRect.left - grid.x
-    const newY = e.clientY + drawEl.scrollTop - dragEl.offsetTop - gridElRect.top - grid.x
-    let newPos = getGridPosByMouse(newX, newY)
-    if (newPos) {
-      const timeDiff = new Date().getTime() - mouseInfo.time
-      switch (currentTool.value) {
-        case 'pen':
-          if (mouseInfo.target === e.target && timeDiff < 200) {
-            console.log('click')
-            const posArray = []
-            posArray.push({ col: newPos.col, row: newPos.row })
-            switch (mirrorMode.value) {
-              case 'horizontal':
-                posArray.push({ col: grid.col - newPos.col - 1, row: newPos.row })
-                break
-              case 'vertical':
-                posArray.push({ col: newPos.col, row: grid.row - newPos.row - 1 })
-                break
-              case 'center':
-                posArray.push({ col: grid.col - newPos.col - 1, row: newPos.row })
-                posArray.push({ col: newPos.col, row: grid.row - newPos.row - 1 })
-                posArray.push({ col: grid.col - newPos.col - 1, row: grid.row - newPos.row - 1 })
-                break
-            }
-            if (button == 0) {
-              if (currentColor.value == '#00000000') {
-                eraseGrid(posArray, currentColor.value)
-              }
-              fillGrid(posArray, currentColor.value)
-            } else if (button == 2) {
-              eraseGrid(posArray, currentColor.value)
-            }
-          }
-          eraseMode.value = false
-          updatePreview()
-          saveCanvasState()
-          break
-        case 'selector':
-          drawControl()
-          break
       }
+      eraseMode.value = false
+      updatePreview()
+      saveCanvasState()
     }
 
-    window.removeEventListener('mousemove', onMouseMove)
-    window.removeEventListener('mouseup', onMouseUp)
+    window.removeEventListener('mousemove', onDrawing)
+    window.removeEventListener('mouseup', onStopDraw)
   }
 }
 </script>
