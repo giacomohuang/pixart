@@ -21,7 +21,7 @@
         <div class="draw" @contextmenu.prevent :class="{ 'cur-move': currentMode == 'move' }">
           <div class="drag" :class="{ 'cur-prevent': currentMode == 'move' }">
             <canvas class="selection"></canvas>
-            <canvas class="canvas" :class="'cur-' + currentTool"></canvas>
+            <canvas class="canvas" :class="['cur-' + currentTool, 'cur-' + currentMode]"></canvas>
             <canvas class="grid"></canvas>
           </div>
         </div>
@@ -457,12 +457,12 @@ function onMouseDown(e) {
   console.log('mouse down')
   const mouseInfo = { target: e.target, time: new Date().getTime() }
   // console.log(drawEl.scrollLeft, drawEl.scrollTop)
-  const orinX = e.clientX + drawEl.scrollLeft - dragEl.offsetLeft - gridElRect.left - grid.x
-  const orinY = e.clientY + drawEl.scrollTop - dragEl.offsetTop - gridElRect.top - grid.x
+  const mouseX = e.clientX + drawEl.scrollLeft - dragEl.offsetLeft - gridElRect.left - grid.x
+  const mouseY = e.clientY + drawEl.scrollTop - dragEl.offsetTop - gridElRect.top - grid.x
   const button = e.button
   // console.log('down', gridElRect, button, currentKey.value)
   // console.log(canvasEl.scrollLeft)
-  let oldPos = getGridPosByMouse(orinX, orinY)
+  let oldPos = getGridPosByMouse(mouseX, mouseY)
   let prevPos = {}
   let delta = {}
   // if (!oldPos) return
@@ -475,25 +475,30 @@ function onMouseDown(e) {
   }
   // 鼠标左键+画笔工具选中：画线
   else if (button == 0 && currentTool.value == 'pen' && currentMode.value == '') {
+    if (!isInCanvas(oldPos.col, oldPos.row)) return
     window.addEventListener('mousemove', onDrawing)
     window.addEventListener('mouseup', onStopDraw)
   }
   // 鼠标左键+油漆桶工具选中：填色
   else if (button === 0 && currentTool.value == 'fill') {
+    if (!isInCanvas(oldPos.col, oldPos.row)) return
     fillArea(oldPos.col, oldPos.row, currentColor.value)
     saveCanvasState()
     updatePreview()
   }
   // 鼠标左键+alt/cmd: 取色
   else if (button == 0 && currentMode.value == 'drop') {
+    if (!isInCanvas(oldPos.col, oldPos.row)) return
     console.log('dropper')
     currentColor.value = getGridColor(oldPos.col, oldPos.row)
     // console.log(currentColor.value)
   }
   // 鼠标左键+选择工具选中：选区
   else if (button == 0 && currentTool.value == 'selector') {
+    console.log(oldPos)
+    if (!isInCanvas(oldPos.col, oldPos.row)) return
     console.log('selection')
-    const oldPos = getGridPosByMouse(e.clientX + drawEl.scrollLeft - dragEl.offsetLeft - gridElRect.left - grid.x, e.clientY + drawEl.scrollTop - dragEl.offsetTop - gridElRect.top - grid.x)
+    // const oldPos = getGridPosByMouse(e.clientX + drawEl.scrollLeft - dragEl.offsetLeft - gridElRect.left - grid.x, e.clientY + drawEl.scrollTop - dragEl.offsetTop - gridElRect.top - grid.x)
     // let newPos = {}
     delta = { x: oldPos.col - selRect.col, y: oldPos.row - selRect.row }
     // 鼠标在选区内：拖动选取
@@ -505,9 +510,6 @@ function onMouseDown(e) {
     // 鼠标在选取外: 绘制/重绘选区
     // inside outside
     else {
-      if (oldPos.col < 0 || oldPos.row < 0 || oldPos.col > grid.col || oldPos.row > grid.row) {
-        return
-      }
       clearSelection()
       window.addEventListener('mousemove', onDrawingSelection)
       window.addEventListener('mouseup', onStopDrawSelection)
@@ -649,6 +651,15 @@ function onMouseDown(e) {
     // 右键：擦除
     else if (button == 2) {
       eraseGrid(posArray, currentColor.value)
+    }
+  }
+  function isInCanvas(col, row) {
+    if (col < 0 || row < 0 || col >= grid.col || row >= grid.row) {
+      console.log('not in')
+      return false
+    } else {
+      console.log('in')
+      return true
     }
   }
 
