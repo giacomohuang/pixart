@@ -14,8 +14,8 @@
         <li title="中心镜像" :class="{ active: mirrorMode === 'center' }" @click="mirrorMode = 'center'"><img src="@/assets/mirror-c.png" alt="中心镜像" /></li>
       </ul>
       <ul class="tools">
-        <li :class="{ active: !reverseAxis }" @click="toggleAxis(false)"><div class="content">正常</div></li>
-        <li :class="{ active: reverseAxis }" @click="toggleAxis(true)"><div class="content">翻转</div></li>
+        <li :class="{ active: !reverseAxis }" @click="toggleAxis(false)"><img src="@/assets/axis.png" alt="正常" /></li>
+        <li :class="{ active: reverseAxis }" @click="toggleAxis(true)"><img src="@/assets/axis-reverse.png" alt="翻转" /></li>
       </ul>
       <div style="margin-left: 20px">pos: {{ mousePos.x }},{{ mousePos.y }}, mode: {{ currentMode }}, tool: {{ currentTool }}</div>
     </div>
